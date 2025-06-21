@@ -9,7 +9,11 @@ function Model({ onLoad, scale }) {
   const gltf = useGLTF('/DamagedHelmet.glb', true)
 
   useEffect(() => {
-    if (gltf?.scene) onLoad?.(gltf.scene)
+    if (!gltf?.scene) {
+      console.error('⚠️ El modelo no se cargó correctamente')
+      return
+    }
+    onLoad?.(gltf.scene)
   }, [gltf])
 
   return (
@@ -165,7 +169,8 @@ function App() {
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        <Environment preset={environment} background />
+        {/* ❌ No usamos background para evitar errores en producción */}
+        <Environment preset={environment} />
         <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
         {HOTSPOTS.map(h => (
           <Hotspot
