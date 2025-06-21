@@ -5,24 +5,11 @@ import * as THREE from 'three'
 import Hotspot from './components/Hotspot'
 import './App.css'
 
-function Model({ onLoad, scale, setError }) {
-  let gltf
-  try {
-const gltf = useGLTF('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb')
-
-  } catch (err) {
-    console.error('❌ Error loading model:', err)
-    setError('Error loading the model. Check path or file.')
-    return null
-  }
+function Model({ onLoad, scale }) {
+  const gltf = useGLTF('/DamagedHelmet.glb', true)
 
   useEffect(() => {
-    if (gltf?.scene) {
-      onLoad?.(gltf.scene)
-    } else {
-      setError('⚠️ Model failed to load.')
-      console.warn('⚠️ Model scene not found')
-    }
+    if (gltf?.scene) onLoad?.(gltf.scene)
   }, [gltf])
 
   return (
@@ -36,33 +23,25 @@ const gltf = useGLTF('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample
 
 function CameraController({ target, tourActive }) {
   const { camera } = useThree()
+  const vec = new THREE.Vector3()
   const [step, setStep] = useState(0)
-  const [progress, setProgress] = useState(0)
   const tourPath = [
     new THREE.Vector3(0, 1, 5),
     new THREE.Vector3(-2, 2, 4),
     new THREE.Vector3(2, 2, -4),
     new THREE.Vector3(0, 1, -5)
   ]
-  const speed = 0.5
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (tourActive) {
-      const from = tourPath[step % tourPath.length]
-      const to = tourPath[(step + 1) % tourPath.length]
-      const newProgress = Math.min(progress + delta * speed, 1)
-      const newPosition = new THREE.Vector3().lerpVectors(from, to, newProgress)
-      camera.position.copy(newPosition)
+      const next = tourPath[step % tourPath.length]
+      camera.position.lerp(vec.copy(next), 0.02)
       camera.lookAt(0, 0, 0)
-      setProgress(newProgress)
-
-      if (newProgress >= 1) {
-        setStep((s) => (s + 1) % tourPath.length)
-        setProgress(0)
+      if (camera.position.distanceTo(next) < 0.1) {
+        setTimeout(() => setStep(s => s + 1), 1500)
       }
     } else if (target) {
-      const vec = new THREE.Vector3().copy(target)
-      camera.position.lerp(vec, 0.05)
+      camera.position.lerp(vec.copy(target), 0.05)
       camera.lookAt(0, 0, 0)
     }
   })
@@ -86,6 +65,26 @@ const HOTSPOTS = [
   { id: 'Top', position: [0, 0.6, 0], label: 'Top View' },
 ]
 
+async function handleScreenshot() {
+  const canvas = document.querySelector('canvas')
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: 'screenshot.png',
+      types: [{
+        description: 'PNG Image',
+        accept: { 'image/png': ['.png'] },
+      }],
+    })
+    const writable = await handle.createWritable()
+    await writable.write(blob)
+    await writable.close()
+    alert('Screenshot saved!')
+  } catch (err) {
+    console.error('Save cancelled or failed:', err)
+  }
+}
+
 function App() {
   const [target, setTarget] = useState(VIEWS.Front)
   const [modelLoaded, setModelLoaded] = useState(false)
@@ -93,7 +92,6 @@ function App() {
   const [scaleInput, setScaleInput] = useState('0.003')
   const [environment, setEnvironment] = useState('sunset')
   const [tourActive, setTourActive] = useState(false)
-  const [error, setError] = useState(null)
 
   const zoom = (factor) => {
     const dir = target.clone().normalize().multiplyScalar(factor)
@@ -118,10 +116,7 @@ function App() {
         {Object.keys(VIEWS).map(view => (
           <button
             key={view}
-            onClick={() => {
-              setTourActive(false)
-              setTarget(VIEWS[view])
-            }}
+            onClick={() => setTarget(VIEWS[view])}
             style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ccc' }}
           >
             {view}
@@ -158,20 +153,21 @@ function App() {
         <button onClick={() => setTourActive(!tourActive)}>
           {tourActive ? 'Stop Tour' : 'Start Tour'}
         </button>
+        <button onClick={handleScreenshot}>Save Screenshot</button>
       </div>
 
-      {(error || !modelLoaded) && (
+      {!modelLoaded && (
         <div style={{
           position: 'absolute',
           top: 20,
           right: 20,
-          backgroundColor: error ? '#ff4444' : '#222',
+          backgroundColor: '#222',
           color: '#fff',
           padding: '8px 16px',
           borderRadius: '8px',
           zIndex: 100
         }}>
-          {error ? `❌ ${error}` : '⏳ Loading model...'}
+          ⏳ Loading model...
         </div>
       )}
 
@@ -179,17 +175,14 @@ function App() {
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        <Environment preset={environment} />
-        <Model onLoad={() => setModelLoaded(true)} scale={modelScale} setError={setError} />
+        <Environment preset={environment} background />
+        <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
         {HOTSPOTS.map(h => (
           <Hotspot
             key={h.id}
             position={h.position}
             text={h.label}
-            onClick={() => {
-              setTourActive(false)
-              setTarget(VIEWS[h.id])
-            }}
+            onClick={() => setTarget(VIEWS[h.id])}
           />
         ))}
         <CameraController target={target} tourActive={tourActive} />
