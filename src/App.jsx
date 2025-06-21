@@ -6,14 +6,10 @@ import Hotspot from './components/Hotspot'
 import './App.css'
 
 function Model({ onLoad, scale }) {
-  const gltf = useGLTF('/DamagedHelmet.glb', true)
+  const gltf = useGLTF('https://drive.google.com/uc?export=download&id=1IwonR8jHQVjudEm6VGFKi49-gWmVzTZX')
 
   useEffect(() => {
-    if (gltf?.scene) {
-      onLoad?.(gltf.scene)
-    } else {
-      console.error('Failed to load model')
-    }
+    if (gltf?.scene) onLoad?.(gltf.scene)
   }, [gltf])
 
   return (
@@ -25,13 +21,35 @@ function Model({ onLoad, scale }) {
   )
 }
 
-function CameraController({ target }) {
+function CameraController({ target, tourActive }) {
   const { camera } = useThree()
-  const vec = new THREE.Vector3()
+  const [step, setStep] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const tourPath = [
+    new THREE.Vector3(0, 1, 5),
+    new THREE.Vector3(-2, 2, 4),
+    new THREE.Vector3(2, 2, -4),
+    new THREE.Vector3(0, 1, -5)
+  ]
+  const speed = 0.5
 
-  useFrame(() => {
-    if (target) {
-      camera.position.lerp(vec.copy(target), 0.05)
+  useFrame((_, delta) => {
+    if (tourActive) {
+      const from = tourPath[step % tourPath.length]
+      const to = tourPath[(step + 1) % tourPath.length]
+      const newProgress = Math.min(progress + delta * speed, 1)
+      const newPosition = new THREE.Vector3().lerpVectors(from, to, newProgress)
+      camera.position.copy(newPosition)
+      camera.lookAt(0, 0, 0)
+      setProgress(newProgress)
+
+      if (newProgress >= 1) {
+        setStep((s) => (s + 1) % tourPath.length)
+        setProgress(0)
+      }
+    } else if (target) {
+      const vec = new THREE.Vector3().copy(target)
+      camera.position.lerp(vec, 0.05)
       camera.lookAt(0, 0, 0)
     }
   })
@@ -60,6 +78,8 @@ function App() {
   const [modelLoaded, setModelLoaded] = useState(false)
   const [modelScale, setModelScale] = useState(0.003)
   const [scaleInput, setScaleInput] = useState('0.003')
+  const [environment, setEnvironment] = useState('sunset')
+  const [tourActive, setTourActive] = useState(false)
 
   const zoom = (factor) => {
     const dir = target.clone().normalize().multiplyScalar(factor)
@@ -68,7 +88,6 @@ function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
-      {/* Control Panel */}
       <div style={{
         position: 'absolute',
         left: 20,
@@ -85,13 +104,11 @@ function App() {
         {Object.keys(VIEWS).map(view => (
           <button
             key={view}
-            onClick={() => setTarget(VIEWS[view])}
-            style={{
-              padding: '5px 10px',
-              cursor: 'pointer',
-              borderRadius: '5px',
-              border: '1px solid #ccc'
+            onClick={() => {
+              setTourActive(false)
+              setTarget(VIEWS[view])
             }}
+            style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ccc' }}
           >
             {view}
           </button>
@@ -100,8 +117,7 @@ function App() {
         <button onClick={() => zoom(1.5)}>Zoom In</button>
         <button onClick={() => zoom(3)}>Zoom Out</button>
         <hr />
-        <label>
-          Scale:
+        <label>Scale:
           <input
             type="number"
             step="0.001"
@@ -111,19 +127,25 @@ function App() {
             style={{ marginLeft: '5px', width: '60px' }}
           />
         </label>
-        <button
-          onClick={() => {
-            const parsed = parseFloat(scaleInput)
-            if (!isNaN(parsed) && parsed > 0) {
-              setModelScale(parsed)
-            }
-          }}
-        >
-          Apply
+        <button onClick={() => {
+          const parsed = parseFloat(scaleInput)
+          if (!isNaN(parsed) && parsed > 0) setModelScale(parsed)
+        }}>Apply</button>
+        <hr />
+        <label>Environment:
+          <select value={environment} onChange={(e) => setEnvironment(e.target.value)}>
+            <option value="sunset">Sunset</option>
+            <option value="night">Night</option>
+            <option value="dawn">Dawn</option>
+            <option value="city">City</option>
+            <option value="warehouse">Warehouse</option>
+          </select>
+        </label>
+        <button onClick={() => setTourActive(!tourActive)}>
+          {tourActive ? 'Stop Tour' : 'Start Tour'}
         </button>
       </div>
 
-      {/* Loading Indicator */}
       {!modelLoaded && (
         <div style={{
           position: 'absolute',
@@ -139,23 +161,24 @@ function App() {
         </div>
       )}
 
-      {/* Canvas 3D */}
       <Canvas
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        {/* HDRI */}
-        <Environment preset="sunset" />
+        <Environment preset={environment} background />
         <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
         {HOTSPOTS.map(h => (
           <Hotspot
             key={h.id}
             position={h.position}
             text={h.label}
-            onClick={() => setTarget(VIEWS[h.id])}
+            onClick={() => {
+              setTourActive(false)
+              setTarget(VIEWS[h.id])
+            }}
           />
         ))}
-        <CameraController target={target} />
+        <CameraController target={target} tourActive={tourActive} />
         <OrbitControls enablePan={false} enableZoom={false} enableRotate={false} />
       </Canvas>
     </div>
