@@ -8,7 +8,8 @@ import './App.css'
 function Model({ onLoad, scale, setError }) {
   let gltf
   try {
-    gltf = useGLTF('/DamagedHelmet.glb', true)
+const gltf = useGLTF('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb')
+
   } catch (err) {
     console.error('❌ Error loading model:', err)
     setError('Error loading the model. Check path or file.')
