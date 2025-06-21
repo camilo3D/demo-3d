@@ -5,15 +5,23 @@ import * as THREE from 'three'
 import Hotspot from './components/Hotspot'
 import './App.css'
 
-function Model({ onLoad, scale }) {
-  const gltf = useGLTF('/DamagedHelmet.glb', true)
+function Model({ onLoad, scale, setError }) {
+  let gltf
+  try {
+    gltf = useGLTF('/DamagedHelmet.glb', true)
+  } catch (err) {
+    console.error('❌ Error loading model:', err)
+    setError('Error loading the model. Check path or file.')
+    return null
+  }
 
   useEffect(() => {
-    if (!gltf?.scene) {
-      console.error('⚠️ El modelo no se cargó correctamente')
-      return
+    if (gltf?.scene) {
+      onLoad?.(gltf.scene)
+    } else {
+      setError('⚠️ Model failed to load.')
+      console.warn('⚠️ Model scene not found')
     }
-    onLoad?.(gltf.scene)
   }, [gltf])
 
   return (
@@ -84,6 +92,7 @@ function App() {
   const [scaleInput, setScaleInput] = useState('0.003')
   const [environment, setEnvironment] = useState('sunset')
   const [tourActive, setTourActive] = useState(false)
+  const [error, setError] = useState(null)
 
   const zoom = (factor) => {
     const dir = target.clone().normalize().multiplyScalar(factor)
@@ -150,18 +159,18 @@ function App() {
         </button>
       </div>
 
-      {!modelLoaded && (
+      {(error || !modelLoaded) && (
         <div style={{
           position: 'absolute',
           top: 20,
           right: 20,
-          backgroundColor: '#222',
+          backgroundColor: error ? '#ff4444' : '#222',
           color: '#fff',
           padding: '8px 16px',
           borderRadius: '8px',
           zIndex: 100
         }}>
-          ⏳ Loading model...
+          {error ? `❌ ${error}` : '⏳ Loading model...'}
         </div>
       )}
 
@@ -169,9 +178,8 @@ function App() {
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        {/* ❌ No usamos background para evitar errores en producción */}
         <Environment preset={environment} />
-        <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
+        <Model onLoad={() => setModelLoaded(true)} scale={modelScale} setError={setError} />
         {HOTSPOTS.map(h => (
           <Hotspot
             key={h.id}
