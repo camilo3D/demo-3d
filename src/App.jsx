@@ -165,7 +165,8 @@ function App() {
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        <Environment preset={environment} background />
+        {/* Sin fondo, solo iluminación ambiental */}
+        <Environment preset={environment} />
         <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
         {HOTSPOTS.map(h => (
           <Hotspot
