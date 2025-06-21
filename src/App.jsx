@@ -6,7 +6,7 @@ import Hotspot from './components/Hotspot'
 import './App.css'
 
 function Model({ onLoad, scale }) {
-  const gltf = useGLTF('https://drive.google.com/uc?export=download&id=1IwonR8jHQVjudEm6VGFKi49-gWmVzTZX')
+  const gltf = useGLTF('/DamagedHelmet.glb', true)
 
   useEffect(() => {
     if (gltf?.scene) onLoad?.(gltf.scene)
@@ -165,8 +165,7 @@ function App() {
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        {/* Sin fondo, solo iluminación ambiental */}
-        <Environment preset={environment} />
+        <Environment preset={environment} background />
         <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
         {HOTSPOTS.map(h => (
           <Hotspot
