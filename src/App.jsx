@@ -9,7 +9,11 @@ function Model({ onLoad, scale }) {
   const gltf = useGLTF('/DamagedHelmet.glb', true)
 
   useEffect(() => {
-    if (gltf?.scene) onLoad?.(gltf.scene)
+    if (gltf?.scene) {
+      onLoad?.(gltf.scene)
+    } else {
+      console.error('Failed to load model')
+    }
   }, [gltf])
 
   return (
@@ -21,26 +25,12 @@ function Model({ onLoad, scale }) {
   )
 }
 
-function CameraController({ target, tourActive }) {
+function CameraController({ target }) {
   const { camera } = useThree()
   const vec = new THREE.Vector3()
-  const [step, setStep] = useState(0)
-  const tourPath = [
-    new THREE.Vector3(0, 1, 5),
-    new THREE.Vector3(-2, 2, 4),
-    new THREE.Vector3(2, 2, -4),
-    new THREE.Vector3(0, 1, -5)
-  ]
 
   useFrame(() => {
-    if (tourActive) {
-      const next = tourPath[step % tourPath.length]
-      camera.position.lerp(vec.copy(next), 0.02)
-      camera.lookAt(0, 0, 0)
-      if (camera.position.distanceTo(next) < 0.1) {
-        setTimeout(() => setStep(s => s + 1), 1500)
-      }
-    } else if (target) {
+    if (target) {
       camera.position.lerp(vec.copy(target), 0.05)
       camera.lookAt(0, 0, 0)
     }
@@ -65,33 +55,11 @@ const HOTSPOTS = [
   { id: 'Top', position: [0, 0.6, 0], label: 'Top View' },
 ]
 
-async function handleScreenshot() {
-  const canvas = document.querySelector('canvas')
-  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
-  try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: 'screenshot.png',
-      types: [{
-        description: 'PNG Image',
-        accept: { 'image/png': ['.png'] },
-      }],
-    })
-    const writable = await handle.createWritable()
-    await writable.write(blob)
-    await writable.close()
-    alert('Screenshot saved!')
-  } catch (err) {
-    console.error('Save cancelled or failed:', err)
-  }
-}
-
 function App() {
   const [target, setTarget] = useState(VIEWS.Front)
   const [modelLoaded, setModelLoaded] = useState(false)
   const [modelScale, setModelScale] = useState(0.003)
   const [scaleInput, setScaleInput] = useState('0.003')
-  const [environment, setEnvironment] = useState('sunset')
-  const [tourActive, setTourActive] = useState(false)
 
   const zoom = (factor) => {
     const dir = target.clone().normalize().multiplyScalar(factor)
@@ -100,6 +68,7 @@ function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
+      {/* Control Panel */}
       <div style={{
         position: 'absolute',
         left: 20,
@@ -117,7 +86,12 @@ function App() {
           <button
             key={view}
             onClick={() => setTarget(VIEWS[view])}
-            style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ccc' }}
+            style={{
+              padding: '5px 10px',
+              cursor: 'pointer',
+              borderRadius: '5px',
+              border: '1px solid #ccc'
+            }}
           >
             {view}
           </button>
@@ -126,7 +100,8 @@ function App() {
         <button onClick={() => zoom(1.5)}>Zoom In</button>
         <button onClick={() => zoom(3)}>Zoom Out</button>
         <hr />
-        <label>Scale:
+        <label>
+          Scale:
           <input
             type="number"
             step="0.001"
@@ -136,26 +111,19 @@ function App() {
             style={{ marginLeft: '5px', width: '60px' }}
           />
         </label>
-        <button onClick={() => {
-          const parsed = parseFloat(scaleInput)
-          if (!isNaN(parsed) && parsed > 0) setModelScale(parsed)
-        }}>Apply</button>
-        <hr />
-        <label>Environment:
-          <select value={environment} onChange={(e) => setEnvironment(e.target.value)}>
-            <option value="sunset">Sunset</option>
-            <option value="night">Night</option>
-            <option value="dawn">Dawn</option>
-            <option value="city">City</option>
-            <option value="warehouse">Warehouse</option>
-          </select>
-        </label>
-        <button onClick={() => setTourActive(!tourActive)}>
-          {tourActive ? 'Stop Tour' : 'Start Tour'}
+        <button
+          onClick={() => {
+            const parsed = parseFloat(scaleInput)
+            if (!isNaN(parsed) && parsed > 0) {
+              setModelScale(parsed)
+            }
+          }}
+        >
+          Apply
         </button>
-        <button onClick={handleScreenshot}>Save Screenshot</button>
       </div>
 
+      {/* Loading Indicator */}
       {!modelLoaded && (
         <div style={{
           position: 'absolute',
@@ -171,11 +139,13 @@ function App() {
         </div>
       )}
 
+      {/* Canvas 3D */}
       <Canvas
         camera={{ position: [0, 0.5, 2], fov: 50 }}
         style={{ backgroundColor: 'black' }}
       >
-        <Environment preset={environment} background />
+        {/* HDRI */}
+        <Environment preset="sunset" />
         <Model onLoad={() => setModelLoaded(true)} scale={modelScale} />
         {HOTSPOTS.map(h => (
           <Hotspot
@@ -185,7 +155,7 @@ function App() {
             onClick={() => setTarget(VIEWS[h.id])}
           />
         ))}
-        <CameraController target={target} tourActive={tourActive} />
+        <CameraController target={target} />
         <OrbitControls enablePan={false} enableZoom={false} enableRotate={false} />
       </Canvas>
     </div>
